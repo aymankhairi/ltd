@@ -177,21 +177,35 @@
             </div>
         </div>
     </section>
+
+
     <section id="contact" class="fade-in">
-        <h2 class="section-title">CONTACT</h2>
-        <form class="contact-form glass-card" action="https://formspree.io/f/mabcdxyz" method="POST">
-            <div class="form-group">
-                <input type="text" placeholder="Your Name" required>
-            </div>
-            <div class="form-group">
-                <input type="email" placeholder="Your Email" required>
-            </div>
-            <div class="form-group">
-                <textarea rows="5" placeholder="Your Message" required></textarea>
-            </div>
-            <button type="submit" class="neural-btn">SEND MESSAGE</button>
-        </form>
-    </section>
+  <h2 class="section-title">CONTACT</h2>
+
+  <!-- NOTE: action removed to prevent native submit; endpoint kept in data-endpoint -->
+  <form
+    class="contact-form glass-card"
+    id="contactForm"
+    method="POST"
+    data-endpoint="https://formspree.io/f/mdkpyzvo"
+    novalidate
+  >
+    <div class="form-group">
+      <input type="text" placeholder="Your Name" name="name" required />
+    </div>
+    <div class="form-group">
+      <input type="email" placeholder="Your Email" name="email" required />
+    </div>
+    <div class="form-group">
+      <textarea rows="5" placeholder="Your Message" name="message" required></textarea>
+    </div>
+    <!-- NOTE: button type="button" prevents implicit native submit via Enter/click -->
+    <button type="button" class="neural-btn" id="sendBtn">SEND MESSAGE</button>
+  </form>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</section>
 
     <footer>
         <div class="footer-content">
@@ -243,5 +257,139 @@
     </footer>
 <script src="tooplate-neural-scripts.js"></script>
 
+<script>
+  (function () {
+    const form = document.getElementById('contactForm');
+    const sendBtn = document.getElementById('sendBtn');
+    const toast = document.getElementById('toast');
+    const endpoint = form.dataset.endpoint; // keep endpoint here to avoid native action
+
+    // helper: show toast with variant
+    function showToast(message, type = 'default') {
+      toast.textContent = message;
+      toast.className = 'toast show ' + type; // adds type class: 'success' | 'error'
+      // auto-hide after 3s
+      setTimeout(() => {
+        toast.classList.remove('show');
+        toast.className = 'toast';
+      }, 3000);
+    }
+
+    // validate using browser validation API; returns true if valid
+    function validateForm() {
+      // Use Constraint Validation API; will show built-in tooltips if invalid
+      if (!form.checkValidity()) {
+        // reportValidity shows browser's validation messages
+        form.reportValidity();
+        return false;
+      }
+      return true;
+    }
+
+    async function sendForm() {
+      // Prevent double sends
+      if (sendBtn.disabled) return;
+
+      // run validation
+      if (!validateForm()) return;
+
+      // prepare data
+      const formData = new FormData(form);
+
+      // UI: disable button while sending
+      sendBtn.disabled = true;
+      sendBtn.setAttribute('aria-busy', 'true');
+
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          body: formData,
+          headers: { Accept: 'application/json' }, // Formspree recommends Accept json
+        });
+
+        // parse json (if any)
+        // Formspree returns JSON for Accept: application/json
+        let json = null;
+        try { json = await res.json(); } catch (err) { /* ignore json parse errors */ }
+
+        if (res.ok) {
+          showToast('✅ Message sent successfully!', 'success');
+          form.reset(); // clear fields
+        } else {
+          // show error message from response if present
+          const msg = (json && (json.error || json.message)) || 'Failed to send message. Please try again.';
+          showToast('❌ ' + msg, 'error');
+        }
+      } catch (err) {
+        showToast('⚠️ Network error. Please try again.', 'error');
+      } finally {
+        sendBtn.disabled = false;
+        sendBtn.removeAttribute('aria-busy');
+      }
+    }
+
+    // primary submit path via button click
+    sendBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      sendForm();
+    });
+
+    // also block Enter key from submitting the form natively in inputs
+    form.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+        // prevent implicit submit when pressing Enter in inputs (not textarea)
+        e.preventDefault();
+        // optionally trigger the JS submit for convenience
+        sendForm();
+      }
+    });
+
+    // Defensive: ensure the form has no action attribute at runtime
+    // (if you still have action in markup, remove it; this double-checks)
+    form.removeAttribute('action');
+
+    // Extra defensive: override onsubmit to prevent any native submit fallback
+    form.onsubmit = (ev) => {
+      ev.preventDefault();
+      return false;
+    };
+  })();
+</script>
+
+
+
+<style>
+  /* Toast styles */
+  .toast {
+    visibility: hidden;
+    min-width: 260px;
+    max-width: calc(100% - 60px);
+    background: rgba(20,20,20,0.8);
+    color: #fff;
+    text-align: left;
+    border-radius: 12px;
+    padding: 12px 16px;
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    font-size: 0.95rem;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.28s ease, transform 0.28s ease;
+    z-index: 10000;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+  }
+
+  .toast.show {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* variant colors */
+  .toast.success { border-left: 4px solid #4caf50; }
+  .toast.error { border-left: 4px solid #e53935; }
+</style>
 </body>
 </html>
